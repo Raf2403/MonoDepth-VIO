@@ -1,0 +1,26 @@
+# ROS2
+build/
+install/
+log/
+
+# Python
+__pycache__/
+*.pyc
+
+# CSV данные (игнорируем все, кроме примерного)
+*.csv
+!ros_imu_data.csv
+
+# Системные файлы Windows
+Thumbs.db
+Desktop.ini
+*.lnk
+
+# Временные файлы
+*.tmp
+*.temp
+*.bak
+
+# Настройки редакторов
+.vscode/
+.idea/
