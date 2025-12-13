@@ -3,7 +3,7 @@
 **Depth-Anything-3** — это модуль для построения карт глубины с помощью нейросети на основе изображения с камеры. Модуль использует предварительно обученные веса модели (`model.safetensors`) и позволяет получать карту глубины в реальном времени.
 
 <p align="center">
-  <img src="assets/images/demo320-2.gif" alt="Depth Anything 3 - Left" width="50%">
+  <img src="assets/images/demo320-2.gif" alt="Depth Anything 3 - Left" width="70%">
 </p>
 
 ## Основные возможности ✨
