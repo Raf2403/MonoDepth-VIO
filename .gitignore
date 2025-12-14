@@ -5,3 +5,4 @@ logs/
 .vscode/
 *.o
 *.so
+*.bag
