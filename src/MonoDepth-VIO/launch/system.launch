@@ -1,0 +1,28 @@
+<launch>
+    <!-- 1. КАМЕРА (ОТКЛЮЧЕНА) -->
+    <!--
+    <include file="$(find realsense2_camera)/launch/rs_camera.launch">
+        <arg name="enable_gyro" value="false"/>
+        <arg name="enable_accel" value="false"/>
+        <arg name="align_depth" value="true"/>
+        <arg name="enable_sync" value="true"/>
+        <arg name="color_width" value="640"/>
+        <arg name="color_height" value="480"/>
+        <arg name="color_fps" value="30"/>
+    </include>
+    -->
+
+    <!-- 2. IPHONE IMU -->
+    <node pkg="imu_csv_publisher" type="imu_data_start.py" name="imu_publisher_node" output="screen">
+        <param name="csv_path" value="$(find imu_csv_publisher)/ros_imu_data.csv"/>
+    </node>
+
+    <!-- 3. OPENVINS (EuroC Config) -->
+    <node name="ov_msckf" pkg="ov_msckf" type="run_subscribe_msckf" output="screen">
+        <!-- ВАЖНО: Указываем путь к estimator_config.yaml -->
+        <param name="config_path" value="$(find ov_msckf)/../config/euroc_mav/estimator_config.yaml"/>
+    </node>
+
+    <!-- 4. RVIZ -->
+    <node type="rviz" name="rviz" pkg="rviz" args="-d $(find ov_msckf)/launch/display.rviz" />
+</launch>

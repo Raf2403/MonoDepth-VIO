@@ -1,0 +1,16 @@
+make_minimum_required(VERSION 3.0.2)
+project(imu_csv_publisher)
+
+find_package(catkin REQUIRED COMPONENTS rospy)
+
+# Эта команда говорит catkin использовать ваш setup.py
+catkin_python_setup()
+
+catkin_package()
+
+# (Опционально) Установка скриптов, чтобы их видел rosrun
+install(PROGRAMS
+   scripts/imu_data_start.py
+   scripts/exp_2_rosbag.py
+   DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
+)

@@ -1,0 +1,10 @@
+<?xml version="1.0"?>
+<package format="2">
+  <name>MonoDepth-VIO</name>
+  <version>0.0.1</version>
+  <description>Main Project Package</description>
+  <maintainer email="user@todo.todo">User</maintainer>
+  <license>TODO</license>
+  <buildtool_depend>catkin</buildtool_depend>
+  <exec_depend>rospy</exec_depend>
+</package>

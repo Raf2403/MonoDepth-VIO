@@ -1,0 +1,7 @@
+<launch>
+    <!-- Запуск узла публикации IMU -->
+    <node pkg="imu_csv_publisher" type="imu_data_start.py" name="imu_publisher_node" output="screen">
+        <!-- Укажите здесь путь к CSV, если скрипт его требует -->
+        <param name="csv_path" value="$(find imu_csv_publisher)/ros_imu_data.csv" />
+    </node>
+</launch>
