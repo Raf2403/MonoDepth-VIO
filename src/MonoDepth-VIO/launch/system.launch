@@ -1,35 +1,50 @@
 <launch>
-    <!-- 1. КАМЕРА REALSENSE (Только видео, без IMU) -->
+    <!-- 1. КАМЕРА REALSENSE (Видеопоток, без IMU) -->
     <include file="$(find realsense2_camera)/launch/rs_camera.launch">
+        <!-- Отключаем встроенный (и несуществующий) IMU -->
         <arg name="enable_gyro" value="false"/>
         <arg name="enable_accel" value="false"/>
-        <arg name="align_depth" value="false"/> <!-- Для VIO обычно нужно чистое Mono/Stereo, а не RGBD -->
         
-        <arg name="enable_sync" value="true"/>
+        <!-- VIO нужны сырые данные, выравнивание глубины может портить тайминги -->
+        <arg name="align_depth" value="false"/> 
+        
+        <!-- Сброс камеры при старте (помогает, если USB завис) -->
+        <arg name="initial_reset" value="true"/>
+        
+        <!-- Параметры видео -->
         <arg name="color_width" value="640"/>
         <arg name="color_height" value="480"/>
         <arg name="color_fps" value="30"/>
+        
+        <!-- Отключаем лишнее для снижения нагрузки -->
+        <arg name="enable_depth" value="false"/> 
+        <arg name="enable_infra1" value="false"/>
+        <arg name="enable_infra2" value="false"/>
     </include>
 
-    <!-- 2. IPHONE IMU -->
-    <node pkg="imu_csv_publisher" type="imu_data_start.py" name="imu_publisher_node" output="screen">
-        <param name="csv_path" value="$(find imu_csv_publisher)/ros_imu_data.csv"/>
-        <!-- Публикуем сразу в нужный топик, чтобы не ремапить -->
-        <remap from="/imu" to="/imu0"/>
+    <!-- 2. IPHONE IMU (LIVE BRIDGE) -->
+    <!-- Запускаем Python-скрипт, который слушает GyrOSC по UDP -->
+    <!-- Убедитесь, что файл gyrosc_bridge.py имеет права на исполнение (chmod +x) -->
+    <node pkg="MonoDepth-VIO" type="gyrosc_bridge.py" name="iphone_imu_bridge" output="screen">
+        <!-- Если нужно, можно передать параметры (но они у нас зашиты в коде) -->
     </node>
 
-    <!-- 3. OPENVINS -->
+    <!-- 3. OPENVINS (VIO ESTIMATOR) -->
     <node name="ov_msckf" pkg="ov_msckf" type="run_subscribe_msckf" output="screen">
-        <!-- Используем конфиг EuroC -->
-        <param name="config_path" value="$(find ov_msckf)/../config/euroc_mav/estimator_config.yaml"/>
+        <!-- ВАЖНО: Используем ВАШ конфиг для D435+iPhone, а не EuroC -->
+        <!-- Если конфига еще нет, создадим его на следующем шаге -->
+        <param name="config_path" value="$(find MonoDepth-VIO)/config/d435_iphone.yaml"/>
         
         <!-- ПЕРЕ-ПРИВЯЗКА ТОПИКОВ (REMAP) -->
-        <!-- Камера: VIO ждет /cam0/image_raw, а RealSense дает /camera/color/image_raw -->
+        <!-- Камера: -->
         <remap from="/cam0/image_raw" to="/camera/color/image_raw"/>
         
-        <!-- IMU: VIO ждет /imu0, мы уже переименовали его в пункте 2 -->
+        <!-- IMU: Наш мост публикует в /iphone/imu, а OpenVINS ждет /imu0 -->
+        <remap from="/imu0" to="/iphone/imu"/>
     </node>
 
-    <!-- 4. RVIZ -->
+    <!-- 4. ВИЗУАЛИЗАЦИЯ (RVIZ) -->
+    <!-- Запускаем Rviz с готовым конфигом OpenVINS -->
     <node type="rviz" name="rviz" pkg="rviz" args="-d $(find ov_msckf)/launch/display.rviz" />
 </launch>
+

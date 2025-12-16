@@ -1,45 +1,68 @@
 %YAML:1.0
 ---
-# TOPICS
-topic_imu: "/imu"
-topic_camera: "/camera/color/image_raw"
+# ==========================================
+#        OPENVINS CONFIG (D435 + iPhone)
+# ==========================================
 
-# FLAGS
-use_stereo: 0
-enable_graph: 1
+# --- ОБЩИЕ НАСТРОЙКИ ---
+verbosity: "INFO"
+use_stereo: false         # У нас одна камера (RGB)
+max_cameras: 1
 
-# IMU PARAMETERS
-sigma_a_c: 2.0000e-03
-sigma_g_c: 1.6968e-04
-sigma_aw_c: 3.0000e-03
-sigma_gw_c: 1.9393e-05
-g: 9.81007
+# --- ТОПИКИ ---
+# (Они переопределяются в launch-файле через remap, но здесь тоже укажем)
+topic_imu: "/iphone/imu"
+topic_camera0: "/camera/color/image_raw"
 
-# CAMERA PARAMETERS
-cam_overlays: 1
-camera_model: "pinhole"
-intrinsics: !!opencv-matrix
-   rows: 1
-   cols: 4
-   dt: d
-   data: [386.0, 386.0, 320.0, 240.0]
-distortion_model: "radtan"
-distortion_coeffs: !!opencv-matrix
-   rows: 1
-   cols: 4
-   dt: d
-   data: [0.0, 0.0, 0.0, 0.0]
-resolution: !!opencv-matrix
-   rows: 1
-   cols: 2
-   dt: i
-   data: [640, 480]
-T_C_I: !!opencv-matrix
-   rows: 4
-   cols: 4
-   dt: d
-   data: [1, 0, 0, 0,
-          0, 1, 0, 0,
-          0, 0, 1, 0,
-          0, 0, 0, 1]
+# --- НАСТРОЙКИ VIO (ГЛАВНОЕ) ---
+# Включаем оценку временного сдвига (ОБЯЗАТЕЛЬНО для Wi-Fi)
+estimate_td: true
+max_td: 0.2               # Допускаем задержку до 200мс (Wi-Fi лагает)
+td_initial: 0.0           # Начальное предположение
+
+# Включаем онлайн-калибровку экстринсиков (расстояния между камерой и телефоном)
+estimate_extrinsics: true 
+
+# --- ПАРАМЕТРЫ IMU (iPhone) ---
+# Значения шума для iPhone (Consumer grade IMU)
+# Если будет сильно "колбасить", увеличьте эти значения в 2-5 раз
+accelerometer_noise_density: 2.00e-03
+accelerometer_random_walk: 3.00e-03
+gyroscope_noise_density: 1.70e-04
+gyroscope_random_walk: 2.00e-05
+
+# Частота IMU (GyrOSC шлет обычно 50 или 100 Гц)
+max_imu_rate: 100
+gravity_mag: 9.81
+
+# --- ПАРАМЕТРЫ КАМЕРЫ (D435) ---
+cam0_is_fisheye: false
+cam0_resolution: [640, 480]
+
+# Интринсики (fx, fy, cx, cy)
+# ВНИМАНИЕ: Я поставил ваши значения [386, 386, 320, 240].
+# Но лучше проверьте их командой: rostopic echo /camera/color/camera_info
+cam0_intrinsics: [386.0, 386.0, 320.0, 240.0]
+
+# Дисторсия (D435 RGB почти плоская, оставляем нули)
+cam0_distortion_model: "radial-tangential"
+cam0_distortion_coeffs: [0.0, 0.0, 0.0, 0.0]
+
+# --- ЭКСТРИНСИКИ (РАСПОЛОЖЕНИЕ) ---
+# T_C0toI: Трансформация от Камеры к IMU.
+# Если вы просто примотали телефон к камере "бутербродом", 
+# оси скорее всего не совпадают.
+# Ниже - Единичная матрица (Identity). 
+# Это значит "Камера и Телефон смотрят в одну сторону, и их центры совпадают".
+# ДЛЯ СТАРТА СОЙДЕТ, но только если estimate_extrinsics: true
+T_C0toI:
+  [1.0, 0.0, 0.0, 0.0,
+   0.0, 1.0, 0.0, 0.0,
+   0.0, 0.0, 1.0, 0.0,
+   0.0, 0.0, 0.0, 1.0]
+
+# --- НАСТРОЙКИ ИНИЦИАЛИЗАЦИИ ---
+# Ждем движения перед стартом (потрясите камерой, чтобы VIO завелось)
+init_window_time: 1.0
+init_imu_thresh: 1.5
 
