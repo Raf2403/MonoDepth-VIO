@@ -31,100 +31,132 @@
 
 ---
 
-## Установка и запуск
+## Исправление ошибок первого запуска (Критично!)
 
-Ниже приведена инструкция для развертывания окружения "с нуля" после клонирования репозитория.
+Из-за несовместимости версий OpenCV внутри Docker-контейнера и на хосте, при первом запуске может возникать ошибка `core dumped` или `Input file is invalid`.
+Необходимо один раз пересобрать пакет внутри контейнера с ограничением памяти.
 
-### 1. Сборка и запуск Docker-контейнера
+1.  Запустите контейнер:
+    ```
+    docker start -ai <имя_вашего_контейнера>
+    ```
 
-Выполните эти команды на хост-машине (терминал Ubuntu):
-
-```
-# 1. Сборка образа
-./build_docker.sh
-
-# 2. Запуск контейнера (проброс USB и графики включен в скрипте)
-sudo ./run_docker.sh
-```
-
-### 2. Сборка пакетов ROS (Внутри контейнера)
-
-После входа в контейнер (приглашение `root@...:/catkin_ws#`):
-
-```
-cd /catkin_ws
-
-# Очистка кэша сборки (во избежание конфликтов)
-catkin clean -y
-
-# Сборка пакетов (используем 2 ядра для стабильности)
-catkin build -j2 -p2
-```
-*Убедитесь, что сборка завершилась сообщением `[build] Summary: All packages succeeded!`.*
-
-### 3. Установка драйверов RealSense
-
-По умолчанию в базовом образе отсутствуют udev-правила и библиотеки для работы с физическим устройством. Выполните установку внутри контейнера:
-
-```
-# Добавление ключей и репозитория Intel
-apt-get update && apt-get install -y software-properties-common curl
-apt-key adv --keyserver keyserver.ubuntu.com --recv-key C8B3A55A6F3EFCDE
-add-apt-repository "deb https://librealsense.intel.com/Debian/apt-repo focal main" -u
-
-# Установка библиотек и ROS-обертки
-apt-get install -y librealsense2-dkms librealsense2-utils librealsense2-dev ros-noetic-realsense2-camera ros-noetic-realsense2-description
-
-# Обновление профиля ROS (ВАЖНО!)
-source /opt/ros/noetic/setup.bash
-rospack profile
-```
-
-### 4. Запуск системы
-
-1.  Подключите камеру RealSense по USB.
-2.  Убедитесь, что файл с данными IMU находится по пути, указанному в `system.launch` (по умолчанию: `src/imu_csv_publisher/ros_imu_data.csv`).
-3.  Запустите основной launch-файл:
-
-```
-source devel/setup.bash
-roslaunch MonoDepth-VIO system.launch
-```
+2.  Внутри контейнера выполните пересборку (флаг `-j 1` обязателен, чтобы избежать вылета по нехватке памяти):
+    ```
+    cd /catkin_ws
+    catkin build ov_msckf --no-deps -j 1 -DCMAKE_BUILD_TYPE=Release
+    source devel/setup.bash
+    ```
 
 ---
 
-## Конфигурация файлов
+## Инструкция по запуску (Runtime)
 
-### system.launch
-Если файл отсутствует, создайте его в `/catkin_ws/src/MonoDepth-VIO/launch/system.launch`:
+Для работы системы потребуются два терминала, подключенных к одному контейнеру.
 
-```
-<launch>
-    <!-- 1. КАМЕРА REALSENSE -->
-    <include file="$(find realsense2_camera)/launch/rs_camera.launch">
-        <arg name="enable_gyro" value="false"/>
-        <arg name="enable_accel" value="false"/>
-        <arg name="align_depth" value="false"/>
-        <arg name="enable_sync" value="true"/>
-        <arg name="color_width" value="640"/>
-        <arg name="color_height" value="480"/>
-        <arg name="color_fps" value="30"/>
-    </include>
+### Терминал 1: Драйверы сенсоров и ROS Core
 
-    <!-- 2. IPHONE IMU PUBLISHER -->
-    <node pkg="imu_csv_publisher" type="imu_data_start.py" name="imu_publisher_node" output="screen">
-        <param name="csv_path" value="$(find imu_csv_publisher)/ros_imu_data.csv"/>
-        <remap from="/imu" to="/imu0"/>
-    </node>
+1.  Подключитесь к работающему контейнеру:
+    ```
+    sudo docker exec -it <имя_вашего_контейнера> bash
+    source /catkin_ws/devel/setup.bash
+    ```
 
-    <!-- 3. OPENVINS ESTIMATOR -->
-    <node name="ov_msckf" pkg="ov_msckf" type="run_subscribe_msckf" output="screen">
-        <param name="config_path" value="$(find ov_msckf)/../config/euroc_mav/estimator_config.yaml"/>
-        <remap from="/cam0/image_raw" to="/camera/color/image_raw"/>
-    </node>
+2.  Запустите компоненты:
+    
+    ```
+    # 1. Запуск ядра ROS
+    roscore &
+    sleep 3
 
-    <!-- 4. ВИЗУАЛИЗАЦИЯ -->
-    <node type="rviz" name="rviz" pkg="rviz" args="-d $(find ov_msckf)/launch/display.rviz" />
-</launch>
-```
-```
+    # 2. Запуск камеры RealSense (RGB 640x480, 30fps, без встроенного IMU)
+    roslaunch realsense2_camera rs_camera.launch \
+      enable_color:=true \
+      color_width:=640 \
+      color_height:=480 \
+      color_fps:=30 \
+      enable_gyro:=false \
+      enable_accel:=false &
+
+    # 3. Запуск моста данных с iPhone (IMU)
+    # (Замените на вашу команду запуска скрипта, который публикует в /iphone/imu)
+    # python3 iphone_bridge.py &
+    ```
+
+3.  Проверьте наличие топиков:
+    ```
+    rostopic list
+    # Вы должны увидеть: /camera/color/image_raw И /iphone/imu
+    ```
+
+### Терминал 2: Алгоритм VIO (OpenVINS)
+
+1.  Подключитесь к тому же контейнеру в новом окне:
+    ```
+    sudo docker exec -it <имя_вашего_контейнера> bash
+    source /catkin_ws/devel/setup.bash
+    ```
+
+2.  Сгенерируйте XML-конфигурацию (Обязательно при каждом перезапуске контейнера):
+    Использование XML вместо YAML обходит баг парсера OpenCV 4.2.0. Выполните этот блок целиком:
+
+    ```
+    python3 -c '
+    xml_content = """<?xml version="1.0"?>
+    <opencv_storage>
+    <verbosity>INFO</verbosity>
+    <use_stereo>0</use_stereo>
+    <max_cameras>1</max_cameras>
+    <topic_imu>/iphone/imu</topic_imu>
+    <topic_camera0>/camera/color/image_raw</topic_camera0>
+    <use_fej>1</use_fej>
+    <integration>rk4</integration>
+    <perform_online_calibration>1</perform_online_calibration>
+    <estimate_td>1</estimate_td>
+    <estimate_extrinsics>1</estimate_extrinsics>
+    <calib_cam_extrinsics>1</calib_cam_extrinsics>
+    <calib_cam_intrinsics>0</calib_cam_intrinsics>
+    <calib_cam_timeoffset>1</calib_cam_timeoffset>
+    <calib_imu_intrinsics>1</calib_imu_intrinsics>
+    <calib_imu_g_sensitivity>0</calib_imu_g_sensitivity>
+    <relative_config_imu>0</relative_config_imu>
+    <relative_config_imucam>0</relative_config_imucam>
+    <accelerometer_noise_density>2.00e-03</accelerometer_noise_density>
+    <accelerometer_random_walk>3.00e-03</accelerometer_random_walk>
+    <gyroscope_noise_density>1.70e-04</gyroscope_noise_density>
+    <gyroscope_random_walk>2.00e-05</gyroscope_random_walk>
+    <max_imu_rate>100</max_imu_rate>
+    <gravity_mag>9.81</gravity_mag>
+    <cam0_is_fisheye>0</cam0_is_fisheye>
+    <cam0_resolution>640 480</cam0_resolution>
+    <cam0_intrinsics>386.0 386.0 320.0 240.0</cam0_intrinsics>
+    <cam0_distortion_model>radial-tangential</cam0_distortion_model>
+    <cam0_distortion_coeffs>0.0 0.0 0.0 0.0</cam0_distortion_coeffs>
+    <T_C0toI type_id="opencv-matrix">
+      <rows>4</rows>
+      <cols>4</cols>
+      <dt>d</dt>
+      <data>1. 0. 0. 0. 0. 1. 0. 0. 0. 0. 1. 0. 0. 0. 0. 1.</data>
+    </T_C0toI>
+    <init_window_time>1.0</init_window_time>
+    <init_imu_thresh>1.0</init_imu_thresh>
+    <max_clones>11</max_clones>
+    <max_slam>50</max_slam>
+    <max_slam_in_update>25</max_slam_in_update>
+    <max_msckf_in_update>40</max_msckf_in_update>
+    <feat_rep_msckf>GLOBAL_3D</feat_rep_msckf>
+    <feat_rep_slam>GLOBAL_3D</feat_rep_slam>
+    <feat_rep_aruco>GLOBAL_3D</feat_rep_aruco>
+    <num_aruco>0</num_aruco>
+    </opencv_storage>
+    """
+    with open("/tmp/config.xml", "w") as f:
+        f.write(xml_content)
+    print("XML config generated.")
+    '
+    ```
+
+3.  Запустите алгоритм:
+    ```
+    rosrun ov_msckf run_subscribe_msckf /tmp/config.xml
+    ```
