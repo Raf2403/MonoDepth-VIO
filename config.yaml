@@ -1,0 +1,48 @@
+%YAML:1.0
+---
+verbosity: "INFO"
+use_stereo: 0
+max_cameras: 1
+save_total_trajectory: 0
+save_total_trajectory_path: "/tmp/traj.txt"
+topic_imu: "/iphone/imu"
+topic_camera0: "/camera/color/image_raw"
+use_fej: 1
+integration: "rk4"
+perform_online_calibration: 1
+estimate_td: 1
+estimate_extrinsics: 1
+calib_cam_extrinsics: 1
+calib_cam_intrinsics: 0
+calib_cam_timeoffset: 1
+calib_imu_intrinsics: 1
+calib_imu_g_sensitivity: 0
+relative_config_imu: 0
+relative_config_imucam: 0
+accelerometer_noise_density: 2.00e-03
+accelerometer_random_walk: 3.00e-03
+gyroscope_noise_density: 1.70e-04
+gyroscope_random_walk: 2.00e-05
+max_imu_rate: 100
+gravity_mag: 9.81
+cam0_is_fisheye: 0
+cam0_resolution: [640, 480]
+cam0_intrinsics: [386.0, 386.0, 320.0, 240.0]
+cam0_distortion_model: "radial-tangential"
+cam0_distortion_coeffs: [0.0, 0.0, 0.0, 0.0]
+# ВНИМАНИЕ: Убрал лишние отступы, сделал их минимальными
+T_C0toI: !!opencv-matrix
+  rows: 4
+  cols: 4
+  dt: d
+  data: [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1]
+init_window_time: 1.0
+init_imu_thresh: 1.0
+max_clones: 11
+max_slam: 50
+max_slam_in_update: 25
+max_msckf_in_update: 40
+feat_rep_msckf: "GLOBAL_3D"
+feat_rep_slam: "GLOBAL_3D"
+feat_rep_aruco: "GLOBAL_3D"
+num_aruco: 0

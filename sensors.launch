@@ -1,0 +1,11 @@
+<launch>
+    <include file="$(find realsense2_camera)/launch/rs_camera.launch">
+        <arg name="enable_gyro" value="false"/>
+        <arg name="enable_accel" value="false"/>
+        <arg name="align_depth" value="false"/>
+        <arg name="color_width" value="640"/>
+        <arg name="color_height" value="480"/>
+        <arg name="color_fps" value="30"/>
+    </include>
+    <node pkg="MonoDepth-VIO" type="gyrosc_bridge.py" name="iphone_imu_bridge" output="screen" />
+</launch>
