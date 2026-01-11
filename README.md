@@ -142,7 +142,7 @@
    rviz2
    ```
 
-5. **В окне rviz слева в меню Fixed Frame пишем global**
+5. **В окне RViz слева в меню Fixed Frame пишем global**
 
 6. **Также в левом нижнем углу жмем на кнопку Add и добавляем 2 топика: /ov_msckf/pathimu и /ov_msckf/poseimu**
 
@@ -208,18 +208,17 @@
    rviz2
    ```
 
-3. **В окне rviz слева в меню Fixed Frame пишем global**
+3. **В окне RViz слева в меню Fixed Frame пишем camera**
 
-4. **Также в левом нижнем углу жмем на кнопку Add и добавляем 2 топика: /cam0/image_raw и /depth/image_raw**
-
-
-5. **Запуск ROS и python-скрипта**  
+4. **Запуск ROS и python-скрипта**  
    ```bash
    source ~/ros2_ws/install/setup.bash
    python3 depth_publisher.py
    ```
 
-6. **Запуска датасета в новом терминале**
+5. **В окне RViz в левом нижнем углу жмем на кнопку Add и добавляем 2 топика: /cam0/image_raw и /depth/image_raw**
+
+6. **Запуск датасета в новом терминале**
    ```bash
    cd ~/Downloads
    source ~/ros2_ws/install/setup.bash
