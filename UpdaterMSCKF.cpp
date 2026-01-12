@@ -208,7 +208,66 @@ void UpdaterMSCKF::update(std::shared_ptr<State> state, std::vector<std::shared_
     /// Chi2 distance check
     Eigen::MatrixXd P_marg = StateHelper::get_marginal_covariance(state, Hx_order);
     Eigen::MatrixXd S = H_x * P_marg * H_x.transpose();
-    S.diagonal() += _options.sigma_pix_sq * Eigen::VectorXd::Ones(S.rows());
+    // ==========================================================
+    // ADAPTIVE NOISE BASED ON CNN DEPTH (Modified Logic)
+    // ==========================================================
+    
+    // 1. Создаем базовый вектор шума (как было раньше)
+    Eigen::VectorXd noise_diagonal = _options.sigma_pix_sq * Eigen::VectorXd::Ones(S.rows());
+    
+    // 2. Достаем оригинальную фичу, чтобы прочитать depth_cnn
+    // (*it2) - это указатель на текущую фичу в цикле
+    double cnn_depth = (*it2)->depth_cnn;
+
+    if (cnn_depth > 0) {
+    PRINT_INFO("Updater sees depth %.2f for feat %d. Processing...\n", cnn_depth, (int)(*it2)->featid);
+    }
+
+    if (cnn_depth > 0.1) {
+        
+        // Получаем геометрическую глубину.
+        // p_FinG - это 3D точка в глобальной системе.
+        // Но cnn_depth - это глубина В КАМЕРЕ (обычно в якоре, anchor frame).
+        
+        // Нам нужно трансформировать p_FinG -> p_FinAnchor
+        // feat.anchor_cam_id и feat.anchor_clone_timestamp уже заполнены выше
+        
+        if (feat.anchor_cam_id != -1) {
+            // Получаем позы якоря (IMU и Camera)
+            Eigen::Matrix3d R_GtoI = state->_clones_IMU.at(feat.anchor_clone_timestamp)->Rot();
+            Eigen::Vector3d p_IinG = state->_clones_IMU.at(feat.anchor_clone_timestamp)->pos();
+            
+            Eigen::Matrix3d R_ItoC = state->_calib_IMUtoCAM.at(feat.anchor_cam_id)->Rot();
+            Eigen::Vector3d p_IinC = state->_calib_IMUtoCAM.at(feat.anchor_cam_id)->pos();
+            
+            // Переводим точку из Global в Anchor Camera Frame
+            // p_C = R_ItoC * (R_GtoI * (p_G - p_I_G)) + p_I_C
+            Eigen::Vector3d p_FinAnchor = R_ItoC * (R_GtoI * (feat.p_FinG - p_IinG)) + p_IinC;
+            
+            double geo_depth = p_FinAnchor(2); // Z-координата = глубина
+            
+            // Считаем ошибку
+            double diff = std::abs(geo_depth - cnn_depth);
+            double relative_error = diff / std::max(geo_depth, 0.1);
+            
+            // === ЛОГИКА ВЗВЕШИВАНИЯ ===
+            if (relative_error < 0.20) {
+                // Глубина совпала! Доверяем фиче больше (уменьшаем шум в 2 раза)
+                noise_diagonal *= 0.5;
+                PRINT_INFO(GREEN "CNN CONFIRMED: Feat %d depth %.2f vs %.2f (err %.2f)\n" RESET, (int)feat.featid, cnn_depth, geo_depth, relative_error);
+            } 
+            else if (relative_error > 0.50) {
+                // Глубина сильно отличается! Это, скорее всего, выброс.
+                // Увеличиваем шум в 100 раз (по сути, игнорируем фичу)
+                noise_diagonal *= 100.0;
+                PRINT_INFO(RED "CNN CONFLICT: Feat %d depth %.2f vs %.2f (err %.2f)\n" RESET, (int)feat.featid, cnn_depth, geo_depth, relative_error);
+            }
+        }
+    }
+    
+    // 3. Применяем модифицированный шум
+    S.diagonal() += noise_diagonal;
+
     double chi2 = res.dot(S.llt().solve(res));
 
     // Get our threshold (we precompute up to 500 but handle the case that it is more)
